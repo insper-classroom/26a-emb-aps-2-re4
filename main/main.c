@@ -15,6 +15,12 @@ QueueHandle_t xQueueADC;
 QueueHandle_t xQueueBtn;
 QueueHandle_t xQueueData;
 
+//Pinos
+#define BTN_PIN_ESC 4
+#define BTN_PIN_GIRAR 5
+#define BTN_PIN_PEGAR 6
+#define BTN_PIN_ENTER 7
+
 void btn_callback(uint gpio, uint32_t events) {
     if (events == 0x04) {
 
