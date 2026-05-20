@@ -9,6 +9,7 @@
 #include "hardware/adc.h"
 
 #include "hardware/gpio.h"
+#include "pins.h"
 
 #define BTN_PIN_ENTER 15
 #define BTN_PIN_ESC 14
@@ -20,6 +21,7 @@ SemaphoreHandle_t xSemaphoreLuz;
 QueueHandle_t xQueueADC;
 QueueHandle_t xQueueBtn;
 QueueHandle_t xQueueData;
+
 
 void btn_callback(uint gpio, uint32_t events) {
     if (events == 0x04) {
@@ -121,8 +123,8 @@ void y_task(void *p) {
     int data_1 = 0;
     int data_2 = 0;
     int data_3 = 0;
-    while (true) {
 
+    while (true) {
         adc_select_input(0);
         int result = adc_read();
         int result_4 = result + data_0 + data_1 + data_2 + data_3;
