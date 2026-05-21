@@ -8,4 +8,4 @@
 #define SENSOR_PIN 7
 
 
-#endif // PINS_H
+#endif

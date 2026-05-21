@@ -22,7 +22,6 @@ QueueHandle_t xQueueADC;
 QueueHandle_t xQueueBtn;
 QueueHandle_t xQueueData;
 
-
 void btn_callback(uint gpio, uint32_t events) {
     if (events == 0x04) {
 
@@ -68,15 +67,24 @@ void buttons_init() {
 }
 /* Task function */
 void input_task(void *pvParameters) {
+    int ligado = 0;
     while ((1)) {
         /* code */
         int ang;
         int ang1;
-        if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(50))) {
-            printf("botao %d\n", ang);
-        }
-        if (xQueueReceive(xQueueADC, &ang1, pdMS_TO_TICKS(50))) {
-            printf("seta %d\n", ang1);
+        if (xSemaphoreTake(xSemaphoreLuz, pdMS_TO_TICKS(100))) {
+            if(!ligado){
+                printf("ligou\n");
+                ligado = 1; 
+            }
+            if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(50))) {
+                printf("botao %d\n", ang);
+            }
+            if (xQueueReceive(xQueueADC, &ang1, pdMS_TO_TICKS(50))) {
+                printf("seta %d\n", ang1);
+            }
+        }else{
+            ligado = 0;
         }
         vTaskDelay(pdMS_TO_TICKS(50));
     }
@@ -135,7 +143,6 @@ void y_task(void *p) {
         data_3 = result_4;
         result_4 -= 2047;
         result_4 /= 8;
-
         if (result_4 > 60) {
             int pos = 2;
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(50));
@@ -167,7 +174,10 @@ void sensor_task(void *p) {
         data_3 = luz_1;
 
         luz_1 -= 3330;
-        printf("luz: %d\n", luz_1);
+        if (luz_1 > 200) {
+            // printf("luz: %d\n", luz_1);
+            xSemaphoreGive(xSemaphoreLuz);
+        }
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
@@ -179,9 +189,9 @@ int main(void) {
     xQueueBtn = xQueueCreate(32, sizeof(int));
     xQueueData = xQueueCreate(32, sizeof(int));
 
-    // xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-    // xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-    // xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
 
     vTaskStartScheduler();
