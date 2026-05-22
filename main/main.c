@@ -16,6 +16,20 @@
 #define BTN_PIN_GIRAR 13
 #define BTN_PIN_PEGAR 12
 #define SENSOR_PIN 7
+#define buzz 11
+
+
+#define UART_ID uart0
+#define BAUD_RATE 115200
+#define CORE_0 (1 << 0)
+#define CORE_1 (1 << 1)
+
+
+
+#define SENSOR_PIN_1 2
+#define X_PIN 3
+#define Y_PIN 4
+#define INPUT_PIN 5
 /* Semaphores */
 SemaphoreHandle_t xSemaphoreLuz;
 QueueHandle_t xQueueADC;
@@ -44,16 +58,23 @@ void btn_callback(uint gpio, uint32_t events) {
     }
 }
 
+void vibra() {
+    gpio_put(buzz, 1);
+    sleep_ms(150);
+    gpio_put(buzz, 0);
+}
 void buttons_init() {
     gpio_init(BTN_PIN_ENTER);
     gpio_init(BTN_PIN_ESC);
     gpio_init(BTN_PIN_GIRAR);
     gpio_init(BTN_PIN_PEGAR);
+    gpio_init(buzz);
 
     gpio_set_dir(BTN_PIN_ENTER, GPIO_IN);
     gpio_set_dir(BTN_PIN_ESC, GPIO_IN);
     gpio_set_dir(BTN_PIN_GIRAR, GPIO_IN);
     gpio_set_dir(BTN_PIN_PEGAR, GPIO_IN);
+    gpio_set_dir(buzz, GPIO_OUT);
 
     gpio_pull_up(BTN_PIN_ENTER);
     gpio_pull_up(BTN_PIN_ESC);
@@ -68,25 +89,45 @@ void buttons_init() {
 /* Task function */
 void input_task(void *pvParameters) {
     int ligado = 0;
+    typedef struct adc {
+        int axis;
+        int val;
+    } adc_t;
+    gpio_init(INPUT_PIN);
+    gpio_set_dir(INPUT_PIN,GPIO_OUT);
     while ((1)) {
         /* code */
+        gpio_put(INPUT_PIN,1);
         int ang;
-        int ang1;
-        if (xSemaphoreTake(xSemaphoreLuz, pdMS_TO_TICKS(100))) {
-            if(!ligado){
+        adc_t joystick;
+        if (xSemaphoreTake(xSemaphoreLuz, pdMS_TO_TICKS(20))) {
+            if (!ligado) {
                 printf("ligou\n");
-                ligado = 1; 
+                ligado = 1;
+                vibra();
             }
-            if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(50))) {
-                printf("botao %d\n", ang);
+            if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(25))) {
+                // printf("botao %d\n", ang);
+                int valor = 42;
+                uart_putc(UART_ID, ang);
+                uart_putc(UART_ID, valor);
+                uart_putc(UART_ID, (valor >> 8));
+                uart_putc(UART_ID, -1);
+                vibra();
             }
-            if (xQueueReceive(xQueueADC, &ang1, pdMS_TO_TICKS(50))) {
-                printf("seta %d\n", ang1);
+            if (xQueueReceive(xQueueADC, &joystick, pdMS_TO_TICKS(25))) {
+                // printf("seta %d\n", joystick.axis);
+                // printf("%d \n", joystick.val);
+                uart_putc(UART_ID, joystick.axis);
+                uart_putc(UART_ID, joystick.val);
+                uart_putc(UART_ID, (joystick.val >> 8));
+                uart_putc(UART_ID, -1);
             }
-        }else{
+        } else {
             ligado = 0;
         }
-        vTaskDelay(pdMS_TO_TICKS(50));
+        gpio_put(INPUT_PIN,0);
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
 void x_task(void *p) {
@@ -98,8 +139,14 @@ void x_task(void *p) {
     int data_2 = 0;
     int data_3 = 0;
     // const float conversion_factor = 3.3f / (1 << 12);
-
+    typedef struct adc {
+        int axis;
+        int val;
+    } adc_t;
+    gpio_init(X_PIN);
+    gpio_set_dir(X_PIN,GPIO_OUT);
     while (true) {
+        gpio_put(X_PIN,1);
         adc_select_input(1);
         int result = adc_read();
         int result_4 = result + data_0 + data_1 + data_2 + data_3;
@@ -110,16 +157,16 @@ void x_task(void *p) {
         data_3 = result_4;
         result_4 -= 2047;
         result_4 /= 8;
-        if (result_4 > 60) {
-            int pos = 4;
-            xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(50));
-
-        } else if (result_4 < -60) {
-            int pos = 5;
-            xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(50));
+        if (result_4 > 50 || result_4 < -50) {
+            adc_t pos;
+            pos.axis = 3;
+            pos.val = result_4;
+            // printf("aaa %d\n",pos.val);
+            xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
         // printf("eixo x: %d\n", result);
-        vTaskDelay(pdMS_TO_TICKS(20));
+        gpio_put(X_PIN,0);
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 
@@ -131,8 +178,14 @@ void y_task(void *p) {
     int data_1 = 0;
     int data_2 = 0;
     int data_3 = 0;
-
+    typedef struct adc {
+        int axis;
+        int val;
+    } adc_t;
+    gpio_init(Y_PIN);
+    gpio_set_dir(Y_PIN,GPIO_OUT);
     while (true) {
+        gpio_put(Y_PIN,1);
         adc_select_input(0);
         int result = adc_read();
         int result_4 = result + data_0 + data_1 + data_2 + data_3;
@@ -143,15 +196,14 @@ void y_task(void *p) {
         data_3 = result_4;
         result_4 -= 2047;
         result_4 /= 8;
-        if (result_4 > 60) {
-            int pos = 2;
-            xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(50));
-
-        } else if (result_4 < -60) {
-            int pos = 3;
-            xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(50));
+        if (result_4 > 50 || result_4 < -50) {
+            adc_t pos;
+            pos.axis = 2;
+            pos.val = result_4;
+            xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
-        vTaskDelay(pdMS_TO_TICKS(20));
+        gpio_put(Y_PIN,0);
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 
@@ -163,7 +215,10 @@ void sensor_task(void *p) {
     int data_1 = 0;
     int data_2 = 0;
     int data_3 = 0;
+    gpio_init(SENSOR_PIN_1);
+    gpio_set_dir(SENSOR_PIN_1,GPIO_OUT);
     while (1) {
+        gpio_put(SENSOR_PIN_1,1);
         adc_select_input(2);
         int luz = adc_read();
         int luz_1 = luz + data_0 + data_1 + data_2 + data_3;
@@ -178,22 +233,36 @@ void sensor_task(void *p) {
             // printf("luz: %d\n", luz_1);
             xSemaphoreGive(xSemaphoreLuz);
         }
+        gpio_put(SENSOR_PIN_1,0);
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 int main(void) {
     stdio_init_all();
     buttons_init();
+    typedef struct adc {
+        int axis;
+        int val;
+    } adc_t;
     xSemaphoreLuz = xSemaphoreCreateBinary();
-    xQueueADC = xQueueCreate(1, sizeof(int));
+    xQueueADC = xQueueCreate(1, sizeof(adc_t));
     xQueueBtn = xQueueCreate(32, sizeof(int));
-    xQueueData = xQueueCreate(32, sizeof(int));
+    xQueueData = xQueueCreate(64, sizeof(int));
 
-    xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-    xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-    xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-    xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    TaskHandle_t xHandle_input;
+    TaskHandle_t xHandle_x_task;
+    TaskHandle_t xHandle_y_task;
+    TaskHandle_t xHandle_sensor;
 
+    xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, & (xHandle_input));
+    xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, & (xHandle_x_task));
+    xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, & (xHandle_y_task));
+    xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, & (xHandle_sensor));
+
+    vTaskCoreAffinitySet( xHandle_input, CORE_0 );
+    vTaskCoreAffinitySet( xHandle_sensor, CORE_1 );
+    vTaskCoreAffinitySet( xHandle_x_task, CORE_1 );
+    vTaskCoreAffinitySet( xHandle_y_task, CORE_1 );
     vTaskStartScheduler();
 
     // Should never reach here
