@@ -28,9 +28,15 @@ def move_mouse(axis, value):
     if axis == 1:
         pdi.press("tab")
     elif axis == 2:
-        pdi.moveRel(value, 0)
+        # pdi.moveRel(value, 0)
+        pdi.press("w")
     elif axis == 3:
-        pdi.moveRel(0, value)
+        # pdi.moveRel(0, value)
+        pdi.press("s")
+    elif axis == 4:
+        pdi.press('d')
+    elif axis == 5:
+        pdi.press('a')
     elif axis == 6:
         pdi.press('pagedown')
     elif axis == 7:
