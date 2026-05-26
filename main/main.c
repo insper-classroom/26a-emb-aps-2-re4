@@ -2,14 +2,13 @@
 #include <task.h>
 #include <semphr.h>
 #include <queue.h>
-// #include "./pins.h"
 #include "pico/stdlib.h"
 #include <stdio.h>
 #include "hardware/uart.h"
 #include "hardware/adc.h"
-
 #include "hardware/gpio.h"
 #include "pins.h"
+
 
 #define BTN_PIN_ENTER 15
 #define BTN_PIN_ESC 14
@@ -60,6 +59,8 @@ void vibra() {
     sleep_ms(150);
     gpio_put(buzz, 0);
 }
+
+
 void buttons_init() {
     gpio_init(BTN_PIN_ENTER);
     gpio_init(BTN_PIN_ESC);
@@ -83,6 +84,8 @@ void buttons_init() {
     gpio_set_irq_enabled(BTN_PIN_GIRAR, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
     gpio_set_irq_enabled(BTN_PIN_PEGAR, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
 }
+
+
 /* Task function */
 void input_task(void *pvParameters) {
     int ligado = 0;
@@ -127,6 +130,8 @@ void input_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
+
+
 void x_task(void *p) {
 
     adc_init();
@@ -174,6 +179,7 @@ void x_task(void *p) {
     }
 }
 
+
 void y_task(void *p) {
     adc_init();
     // const float conversion_factor = 3.3f / (1 << 12);
@@ -217,6 +223,7 @@ void y_task(void *p) {
     }
 }
 
+
 void sensor_task(void *p) {
     adc_init();
     // const float conversion_factor = 3.3f / (1 << 12);
@@ -247,6 +254,8 @@ void sensor_task(void *p) {
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
+
+
 int main(void) {
     stdio_init_all();
     buttons_init();
