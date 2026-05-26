@@ -8,7 +8,7 @@
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "pins.h"
-
+#include "hc06.h"
 
 #define BTN_PIN_ENTER 15
 #define BTN_PIN_ESC 14
@@ -26,12 +26,23 @@
 #define X_PIN 3
 #define Y_PIN 4
 #define INPUT_PIN 5
+
 /* Semaphores */
 SemaphoreHandle_t xSemaphoreLuz;
 QueueHandle_t xQueueADC;
 QueueHandle_t xQueueBtn;
 QueueHandle_t xQueueData;
+QueueHandle_t xQueueTX;
 
+typedef struct {
+    int axis;
+    int val;
+} adc_t;
+
+void uart_rx_handler() {
+    uart_getc(HC06_UART_ID);
+    // xSemaphoreGiveFromISR(xSemaphoreConnection, 0);
+}
 void btn_callback(uint gpio, uint32_t events) {
     if (events == 0x04) {
 
@@ -60,6 +71,22 @@ void vibra() {
     gpio_put(buzz, 0);
 }
 
+void init_uart_irq() {
+    // Turn off FIFO's - we want to do this character by character
+    uart_set_fifo_enabled(HC06_UART_ID, false);
+
+    // Set up a RX interrupt
+    // We need to set up the handler first
+    // Select correct interrupt for the UART we are using
+    int UART_IRQ = HC06_UART_ID == uart0 ? UART0_IRQ : UART1_IRQ;
+
+    // And set up and enable the interrupt handlers
+    irq_set_exclusive_handler(UART_IRQ, uart_rx_handler);
+    irq_set_enabled(UART_IRQ, true);
+
+    // Now enable the UART to send interrupts - RX only
+    uart_set_irq_enables(HC06_UART_ID, true, false);
+}
 
 void buttons_init() {
     gpio_init(BTN_PIN_ENTER);
@@ -85,14 +112,23 @@ void buttons_init() {
     gpio_set_irq_enabled(BTN_PIN_PEGAR, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
 }
 
+static void tx_task(void *p) {
+    adc_t data;
+
+    while (true) {
+        if (xQueueReceive(xQueueTX, &data, portMAX_DELAY) == pdTRUE) {
+            uart_putc_raw(HC06_UART_ID, data.axis);
+            uart_putc_raw(HC06_UART_ID, data.val);
+            uart_putc_raw(HC06_UART_ID, data.val >> 8);
+            uart_putc_raw(HC06_UART_ID, -1);
+        }
+        vTaskDelay(pdMS_TO_TICKS(15));
+    }
+}
 
 /* Task function */
 void input_task(void *pvParameters) {
     int ligado = 0;
-    typedef struct adc {
-        int axis;
-        int val;
-    } adc_t;
     gpio_init(INPUT_PIN);
     gpio_set_dir(INPUT_PIN, GPIO_OUT);
     while ((1)) {
@@ -131,6 +167,12 @@ void input_task(void *pvParameters) {
     }
 }
 
+void bluetooth_task(void *p) {
+
+    while (true) {
+        vTaskDelay(pdMS_TO_TICKS(30));
+    }
+}
 
 void x_task(void *p) {
 
@@ -141,10 +183,6 @@ void x_task(void *p) {
     int data_2 = 0;
     int data_3 = 0;
     // const float conversion_factor = 3.3f / (1 << 12);
-    typedef struct adc {
-        int axis;
-        int val;
-    } adc_t;
     gpio_init(X_PIN);
     gpio_set_dir(X_PIN, GPIO_OUT);
     while (true) {
@@ -179,7 +217,6 @@ void x_task(void *p) {
     }
 }
 
-
 void y_task(void *p) {
     adc_init();
     // const float conversion_factor = 3.3f / (1 << 12);
@@ -188,10 +225,6 @@ void y_task(void *p) {
     int data_1 = 0;
     int data_2 = 0;
     int data_3 = 0;
-    typedef struct adc {
-        int axis;
-        int val;
-    } adc_t;
     gpio_init(Y_PIN);
     gpio_set_dir(Y_PIN, GPIO_OUT);
     while (true) {
@@ -222,7 +255,6 @@ void y_task(void *p) {
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
-
 
 void sensor_task(void *p) {
     adc_init();
@@ -255,30 +287,46 @@ void sensor_task(void *p) {
     }
 }
 
+void init_uart_hc06(void) {
+    uart_init(HC06_UART_ID, HC06_BAUD_RATE);
+
+    gpio_set_function(HC06_TX_PIN, UART_FUNCSEL_NUM(HC06_UART_ID, HC06_TX_PIN));
+    gpio_set_function(HC06_RX_PIN, UART_FUNCSEL_NUM(HC06_UART_ID, HC06_RX_PIN));
+
+    int __unused actual = uart_set_baudrate(HC06_UART_ID, HC06_BAUD_RATE);
+
+    uart_set_hw_flow(HC06_UART_ID, false, false);
+
+    uart_set_format(HC06_UART_ID, 8, 1, UART_PARITY_NONE);
+}
 
 int main(void) {
     stdio_init_all();
     buttons_init();
-    typedef struct adc {
-        int axis;
-        int val;
-    } adc_t;
+    init_uart_hc06();
+    init_uart_irq();
+    hc06_config("MARIO", "3425");
+
     xSemaphoreLuz = xSemaphoreCreateBinary();
     xQueueADC = xQueueCreate(1, sizeof(adc_t));
     xQueueBtn = xQueueCreate(32, sizeof(int));
     xQueueData = xQueueCreate(64, sizeof(int));
+    xQueueTX = xQueueCreate(32, sizeof(adc_t));
 
     TaskHandle_t xHandle_input;
     TaskHandle_t xHandle_x_task;
     TaskHandle_t xHandle_y_task;
     TaskHandle_t xHandle_sensor;
+    TaskHandle_t xHandle_bluetooth;
 
     xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_input));
     xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_x_task));
     xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_y_task));
     xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_sensor));
+    xTaskCreate(bluetooth_task, "Bluetooth task", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_bluetooth));
 
     vTaskCoreAffinitySet(xHandle_input, CORE_0);
+    vTaskCoreAffinitySet(xHandle_bluetooth, CORE_0);
     vTaskCoreAffinitySet(xHandle_sensor, CORE_1);
     vTaskCoreAffinitySet(xHandle_x_task, CORE_1);
     vTaskCoreAffinitySet(xHandle_y_task, CORE_1);
