@@ -18,13 +18,10 @@
 #define SENSOR_PIN 7
 #define buzz 11
 
-
 #define UART_ID uart0
 #define BAUD_RATE 115200
 #define CORE_0 (1 << 0)
 #define CORE_1 (1 << 1)
-
-
 
 #define SENSOR_PIN_1 2
 #define X_PIN 3
@@ -94,10 +91,10 @@ void input_task(void *pvParameters) {
         int val;
     } adc_t;
     gpio_init(INPUT_PIN);
-    gpio_set_dir(INPUT_PIN,GPIO_OUT);
+    gpio_set_dir(INPUT_PIN, GPIO_OUT);
     while ((1)) {
         /* code */
-        gpio_put(INPUT_PIN,1);
+        gpio_put(INPUT_PIN, 1);
         int ang;
         adc_t joystick;
         if (xSemaphoreTake(xSemaphoreLuz, pdMS_TO_TICKS(20))) {
@@ -126,7 +123,7 @@ void input_task(void *pvParameters) {
         } else {
             ligado = 0;
         }
-        gpio_put(INPUT_PIN,0);
+        gpio_put(INPUT_PIN, 0);
         vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
@@ -144,9 +141,9 @@ void x_task(void *p) {
         int val;
     } adc_t;
     gpio_init(X_PIN);
-    gpio_set_dir(X_PIN,GPIO_OUT);
+    gpio_set_dir(X_PIN, GPIO_OUT);
     while (true) {
-        gpio_put(X_PIN,1);
+        gpio_put(X_PIN, 1);
         adc_select_input(1);
         int result = adc_read();
         int result_4 = result + data_0 + data_1 + data_2 + data_3;
@@ -157,15 +154,22 @@ void x_task(void *p) {
         data_3 = result_4;
         result_4 -= 2047;
         result_4 /= 8;
-        if (result_4 > 50 || result_4 < -50) {
+        if (result_4 > 100) {
             adc_t pos;
-            pos.axis = 3;
+            pos.axis = 4;
+            pos.val = result_4;
+            // printf("aaa %d\n",pos.val);
+            xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
+        }
+        if (result_4 < -100) {
+            adc_t pos;
+            pos.axis = 5;
             pos.val = result_4;
             // printf("aaa %d\n",pos.val);
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
         // printf("eixo x: %d\n", result);
-        gpio_put(X_PIN,0);
+        gpio_put(X_PIN, 0);
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
@@ -183,9 +187,9 @@ void y_task(void *p) {
         int val;
     } adc_t;
     gpio_init(Y_PIN);
-    gpio_set_dir(Y_PIN,GPIO_OUT);
+    gpio_set_dir(Y_PIN, GPIO_OUT);
     while (true) {
-        gpio_put(Y_PIN,1);
+        gpio_put(Y_PIN, 1);
         adc_select_input(0);
         int result = adc_read();
         int result_4 = result + data_0 + data_1 + data_2 + data_3;
@@ -196,13 +200,19 @@ void y_task(void *p) {
         data_3 = result_4;
         result_4 -= 2047;
         result_4 /= 8;
-        if (result_4 > 50 || result_4 < -50) {
+        if (result_4 > 100) {
             adc_t pos;
             pos.axis = 2;
             pos.val = result_4;
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
-        gpio_put(Y_PIN,0);
+        if (result_4 < -100) {
+            adc_t pos;
+            pos.axis = 3;
+            pos.val = result_4;
+            xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
+        }
+        gpio_put(Y_PIN, 0);
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
@@ -216,9 +226,9 @@ void sensor_task(void *p) {
     int data_2 = 0;
     int data_3 = 0;
     gpio_init(SENSOR_PIN_1);
-    gpio_set_dir(SENSOR_PIN_1,GPIO_OUT);
+    gpio_set_dir(SENSOR_PIN_1, GPIO_OUT);
     while (1) {
-        gpio_put(SENSOR_PIN_1,1);
+        gpio_put(SENSOR_PIN_1, 1);
         adc_select_input(2);
         int luz = adc_read();
         int luz_1 = luz + data_0 + data_1 + data_2 + data_3;
@@ -233,7 +243,7 @@ void sensor_task(void *p) {
             // printf("luz: %d\n", luz_1);
             xSemaphoreGive(xSemaphoreLuz);
         }
-        gpio_put(SENSOR_PIN_1,0);
+        gpio_put(SENSOR_PIN_1, 0);
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
@@ -254,15 +264,15 @@ int main(void) {
     TaskHandle_t xHandle_y_task;
     TaskHandle_t xHandle_sensor;
 
-    xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, & (xHandle_input));
-    xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, & (xHandle_x_task));
-    xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, & (xHandle_y_task));
-    xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, & (xHandle_sensor));
+    xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_input));
+    xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_x_task));
+    xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_y_task));
+    xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_sensor));
 
-    vTaskCoreAffinitySet( xHandle_input, CORE_0 );
-    vTaskCoreAffinitySet( xHandle_sensor, CORE_1 );
-    vTaskCoreAffinitySet( xHandle_x_task, CORE_1 );
-    vTaskCoreAffinitySet( xHandle_y_task, CORE_1 );
+    vTaskCoreAffinitySet(xHandle_input, CORE_0);
+    vTaskCoreAffinitySet(xHandle_sensor, CORE_1);
+    vTaskCoreAffinitySet(xHandle_x_task, CORE_1);
+    vTaskCoreAffinitySet(xHandle_y_task, CORE_1);
     vTaskStartScheduler();
 
     // Should never reach here
