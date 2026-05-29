@@ -9,7 +9,6 @@
 #include "hardware/gpio.h"
 #include "pins.h"
 
-
 #define BTN_PIN_ENTER 15
 #define BTN_PIN_ESC 14
 #define BTN_PIN_GIRAR 13
@@ -33,7 +32,7 @@ QueueHandle_t xQueueBtn;
 QueueHandle_t xQueueData;
 
 void btn_callback(uint gpio, uint32_t events) {
-    if (events == 0x04) {
+    if (events == 0x08) {
 
         if (gpio == BTN_PIN_ENTER) {
             int btn = 7;
@@ -56,10 +55,9 @@ void btn_callback(uint gpio, uint32_t events) {
 
 void vibra() {
     gpio_put(buzz, 1);
-    sleep_ms(150);
+    vTaskDelay(pdMS_TO_TICKS(150));
     gpio_put(buzz, 0);
 }
-
 
 void buttons_init() {
     gpio_init(BTN_PIN_ENTER);
@@ -85,7 +83,6 @@ void buttons_init() {
     gpio_set_irq_enabled(BTN_PIN_PEGAR, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
 }
 
-
 /* Task function */
 void input_task(void *pvParameters) {
     int ligado = 0;
@@ -95,42 +92,52 @@ void input_task(void *pvParameters) {
     } adc_t;
     gpio_init(INPUT_PIN);
     gpio_set_dir(INPUT_PIN, GPIO_OUT);
+
+    uart_init(UART_ID, BAUD_RATE);
+
+    gpio_set_function(0, GPIO_FUNC_UART); // TX
+    gpio_set_function(1, GPIO_FUNC_UART); // RX
     while ((1)) {
         /* code */
         gpio_put(INPUT_PIN, 1);
         int ang;
         adc_t joystick;
-        if (xSemaphoreTake(xSemaphoreLuz, pdMS_TO_TICKS(20))) {
+        if (xSemaphoreTake(xSemaphoreLuz, pdMS_TO_TICKS(50))) {
             if (!ligado) {
-                printf("ligou\n");
-                ligado = 1;
-                vibra();
-            }
-            if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(25))) {
-                // printf("botao %d\n", ang);
                 int valor = 42;
-                uart_putc(UART_ID, ang);
+                uart_putc(UART_ID, 1);
                 uart_putc(UART_ID, valor);
                 uart_putc(UART_ID, (valor >> 8));
                 uart_putc(UART_ID, -1);
+                ligado = 1;
                 vibra();
             }
-            if (xQueueReceive(xQueueADC, &joystick, pdMS_TO_TICKS(25))) {
-                // printf("seta %d\n", joystick.axis);
-                // printf("%d \n", joystick.val);
-                uart_putc(UART_ID, joystick.axis);
-                uart_putc(UART_ID, joystick.val);
-                uart_putc(UART_ID, (joystick.val >> 8));
-                uart_putc(UART_ID, -1);
-            }
+        if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(50))) {
+            // printf("botao %d\n", ang);
+            int valor = 42;
+            uart_putc(UART_ID, -1);
+            uart_putc(UART_ID, ang);
+            uart_putc(UART_ID, valor);
+            uart_putc(UART_ID, (valor >> 8));
+            vibra();
+            vTaskDelay(pdMS_TO_TICKS(500));
+        } 
+        // else if (xQueueReceive(xQueueADC, &joystick, pdMS_TO_TICKS(50))) {
+        //     // printf("seta %d\n", joystick.axis);
+        //     // printf("%d \n", joystick.val);
+        //     uart_putc(UART_ID, joystick.axis);
+        //     uart_putc(UART_ID, joystick.val);
+        //     uart_putc(UART_ID, (joystick.val >> 8));
+        //     uart_putc(UART_ID, -1);
+        //     vTaskDelay(pdMS_TO_TICKS(500));
+        // }
         } else {
             ligado = 0;
         }
         gpio_put(INPUT_PIN, 0);
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
-
 
 void x_task(void *p) {
 
@@ -179,7 +186,6 @@ void x_task(void *p) {
     }
 }
 
-
 void y_task(void *p) {
     adc_init();
     // const float conversion_factor = 3.3f / (1 << 12);
@@ -223,7 +229,6 @@ void y_task(void *p) {
     }
 }
 
-
 void sensor_task(void *p) {
     adc_init();
     // const float conversion_factor = 3.3f / (1 << 12);
@@ -254,7 +259,6 @@ void sensor_task(void *p) {
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
-
 
 int main(void) {
     stdio_init_all();
