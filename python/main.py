@@ -8,7 +8,7 @@ import glob
 import serial
 import pyautogui
 pyautogui.PAUSE = 0  # Remove delay between actions
-pdi.PAUSE = 0
+# pdi.PAUSE = 1
 
 
 def move_mouse(axis, value):
@@ -25,6 +25,7 @@ def move_mouse(axis, value):
     * 10 - Desseleciona o item (Esc)
     * 11 - Pega o item selecionado (Backspace)
     """
+    print(axis)
     if axis == 1:
         pdi.press("tab")
     elif axis == 2:
