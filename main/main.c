@@ -308,8 +308,8 @@ int main(void) {
     stdio_init_all();
     buttons_init();
     init_uart_hc06();
+    // hc06_config("MARIO", "3425");
     init_uart_irq();
-    hc06_config("MARIO", "3425");
 
     xSemaphoreLuz = xSemaphoreCreateBinary();
     xQueueADC = xQueueCreate(1, sizeof(adc_t));
@@ -323,19 +323,21 @@ int main(void) {
     TaskHandle_t xHandle_sensor;
     // TaskHandle_t xHandle_bluetooth;
 
-    xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_input));
-    xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_x_task));
-    xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_y_task));
-    xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_sensor));
-    // xTaskCreate(bluetooth_task, "Bluetooth task", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_bluetooth));
+    if (hc06_config("MARIO", "3425")) {
 
-    vTaskCoreAffinitySet(xHandle_input, CORE_0);
-    // vTaskCoreAffinitySet(xHandle_bluetooth, CORE_0);
-    vTaskCoreAffinitySet(xHandle_sensor, CORE_1);
-    vTaskCoreAffinitySet(xHandle_x_task, CORE_1);
-    vTaskCoreAffinitySet(xHandle_y_task, CORE_1);
-    vTaskStartScheduler();
-
+        xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_input));
+        xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_x_task));
+        xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_y_task));
+        xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_sensor));
+        // xTaskCreate(bluetooth_task, "Bluetooth task", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_bluetooth));
+        
+        vTaskCoreAffinitySet(xHandle_input, CORE_0);
+        // vTaskCoreAffinitySet(xHandle_bluetooth, CORE_0);
+        vTaskCoreAffinitySet(xHandle_sensor, CORE_1);
+        vTaskCoreAffinitySet(xHandle_x_task, CORE_1);
+        vTaskCoreAffinitySet(xHandle_y_task, CORE_1);
+        vTaskStartScheduler();
+    }
     // Should never reach here
     for (;;)
         ;
