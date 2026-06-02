@@ -144,30 +144,29 @@ void input_task(void *pvParameters) {
         if (xSemaphoreTake(xSemaphoreLuz, pdMS_TO_TICKS(50))) {
             if (!ligado) {
                 int valor = 42;
-                uart_putc(UART_ID, -1);
-                uart_putc(UART_ID, 1);
-                uart_putc(UART_ID, valor);
-                uart_putc(UART_ID, (valor >> 8));
+                uart_putc(HC06_UART_ID, -1);
+                uart_putc(HC06_UART_ID, 1);
+                uart_putc(HC06_UART_ID, valor);
+                uart_putc(HC06_UART_ID, (valor >> 8));
                 ligado = 1;
                 vibra();
             }
             if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(50))) {
                 // printf("botao %d\n", ang);
                 int valor = 42;
-                uart_putc(UART_ID, -1);
-                uart_putc(UART_ID, ang);
-                uart_putc(UART_ID, valor);
-                uart_putc(UART_ID, (valor >> 8));
+                uart_putc(HC06_UART_ID, -1);
+                uart_putc(HC06_UART_ID, ang);
+                uart_putc(HC06_UART_ID, valor);
+                uart_putc(HC06_UART_ID, (valor >> 8));
                 vibra();
                 vTaskDelay(pdMS_TO_TICKS(500));
             } else if (xQueueReceive(xQueueADC, &joystick, pdMS_TO_TICKS(50))) {
                 // printf("seta %d\n", joystick.axis);
                 // printf("%d \n", joystick.val);
-                uart_putc(UART_ID, -1);
-
-                uart_putc(UART_ID, joystick.axis);
-                uart_putc(UART_ID, joystick.val);
-                uart_putc(UART_ID, (joystick.val >> 8));
+                uart_putc(HC06_UART_ID, -1);
+                uart_putc(HC06_UART_ID, joystick.axis);
+                uart_putc(HC06_UART_ID, joystick.val);
+                uart_putc(HC06_UART_ID, (joystick.val >> 8));
                 vTaskDelay(pdMS_TO_TICKS(500));
             }
         } else {
@@ -178,12 +177,6 @@ void input_task(void *pvParameters) {
     }
 }
 
-void bluetooth_task(void *p) {
-
-    while (true) {
-        vTaskDelay(pdMS_TO_TICKS(30));
-    }
-}
 
 void x_task(void *p) {
 
@@ -321,23 +314,23 @@ int main(void) {
     xSemaphoreLuz = xSemaphoreCreateBinary();
     xQueueADC = xQueueCreate(1, sizeof(adc_t));
     xQueueBtn = xQueueCreate(32, sizeof(int));
-    xQueueData = xQueueCreate(64, sizeof(int));
+    xQueueData = xQueueCreate(64, sizeof(adc_t));
     xQueueTX = xQueueCreate(32, sizeof(adc_t));
 
     TaskHandle_t xHandle_input;
     TaskHandle_t xHandle_x_task;
     TaskHandle_t xHandle_y_task;
     TaskHandle_t xHandle_sensor;
-    TaskHandle_t xHandle_bluetooth;
+    // TaskHandle_t xHandle_bluetooth;
 
     xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_input));
     xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_x_task));
     xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_y_task));
     xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_sensor));
-    xTaskCreate(bluetooth_task, "Bluetooth task", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_bluetooth));
+    // xTaskCreate(bluetooth_task, "Bluetooth task", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_bluetooth));
 
     vTaskCoreAffinitySet(xHandle_input, CORE_0);
-    vTaskCoreAffinitySet(xHandle_bluetooth, CORE_0);
+    // vTaskCoreAffinitySet(xHandle_bluetooth, CORE_0);
     vTaskCoreAffinitySet(xHandle_sensor, CORE_1);
     vTaskCoreAffinitySet(xHandle_x_task, CORE_1);
     vTaskCoreAffinitySet(xHandle_y_task, CORE_1);
