@@ -144,32 +144,32 @@ void input_task(void *pvParameters) {
         if (xSemaphoreTake(xSemaphoreLuz, pdMS_TO_TICKS(50))) {
             if (!ligado) {
                 int valor = 42;
+                uart_putc(UART_ID, -1);
                 uart_putc(UART_ID, 1);
                 uart_putc(UART_ID, valor);
                 uart_putc(UART_ID, (valor >> 8));
-                uart_putc(UART_ID, -1);
                 ligado = 1;
                 vibra();
             }
-        if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(50))) {
-            // printf("botao %d\n", ang);
-            int valor = 42;
-            uart_putc(UART_ID, -1);
-            uart_putc(UART_ID, ang);
-            uart_putc(UART_ID, valor);
-            uart_putc(UART_ID, (valor >> 8));
-            vibra();
-            vTaskDelay(pdMS_TO_TICKS(500));
-        } 
-        // else if (xQueueReceive(xQueueADC, &joystick, pdMS_TO_TICKS(50))) {
-        //     // printf("seta %d\n", joystick.axis);
-        //     // printf("%d \n", joystick.val);
-        //     uart_putc(UART_ID, joystick.axis);
-        //     uart_putc(UART_ID, joystick.val);
-        //     uart_putc(UART_ID, (joystick.val >> 8));
-        //     uart_putc(UART_ID, -1);
-        //     vTaskDelay(pdMS_TO_TICKS(500));
-        // }
+            if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(50))) {
+                // printf("botao %d\n", ang);
+                int valor = 42;
+                uart_putc(UART_ID, -1);
+                uart_putc(UART_ID, ang);
+                uart_putc(UART_ID, valor);
+                uart_putc(UART_ID, (valor >> 8));
+                vibra();
+                vTaskDelay(pdMS_TO_TICKS(500));
+            } else if (xQueueReceive(xQueueADC, &joystick, pdMS_TO_TICKS(50))) {
+                // printf("seta %d\n", joystick.axis);
+                // printf("%d \n", joystick.val);
+                uart_putc(UART_ID, -1);
+
+                uart_putc(UART_ID, joystick.axis);
+                uart_putc(UART_ID, joystick.val);
+                uart_putc(UART_ID, (joystick.val >> 8));
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
         } else {
             ligado = 0;
         }
