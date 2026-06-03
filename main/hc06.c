@@ -86,15 +86,15 @@ bool hc06_config(char name[], char pin[]) {
     bool connected = false;
     bool already_115200 = false;
 
-    // if (hc06_tentar_baud(9600)) {
-    //     connected = true;
-    //     already_115200 = false;
-    // } else {
-    //     if (hc06_tentar_baud(115200)) {
-    //         connected = true;
-    //         already_115200 = true;
-    //     }
-    // }
+    if (hc06_tentar_baud(9600)) {
+        connected = true;
+        already_115200 = false;
+    } else {
+        if (hc06_tentar_baud(115200)) {
+            connected = true;
+            already_115200 = true;
+        }
+    }
 
     if (hc06_tentar_baud(115200)) {
         connected = true;

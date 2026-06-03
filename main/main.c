@@ -10,22 +10,13 @@
 #include "pins.h"
 #include "hc06.h"
 
-#define BTN_PIN_ENTER 15
-#define BTN_PIN_ESC 14
-#define BTN_PIN_GIRAR 13
-#define BTN_PIN_PEGAR 12
-#define SENSOR_PIN 7
-#define buzz 11
-
 #define UART_ID uart0
 #define BAUD_RATE 115200
 #define CORE_0 (1 << 0)
 #define CORE_1 (1 << 1)
 
-#define SENSOR_PIN_1 2
-#define X_PIN 3
-#define Y_PIN 4
-#define INPUT_PIN 5
+// Nome - MARIO
+// PIN - 4269
 
 /* Semaphores */
 SemaphoreHandle_t xSemaphoreLuz;
@@ -43,6 +34,7 @@ void uart_rx_handler() {
     uart_getc(HC06_UART_ID);
     // xSemaphoreGiveFromISR(xSemaphoreConnection, 0);
 }
+
 void btn_callback(uint gpio, uint32_t events) {
     if (events == 0x08) {
 
@@ -66,9 +58,9 @@ void btn_callback(uint gpio, uint32_t events) {
 }
 
 void vibra() {
-    gpio_put(buzz, 1);
+    gpio_put(BUZZER, 1);
     vTaskDelay(pdMS_TO_TICKS(150));
-    gpio_put(buzz, 0);
+    gpio_put(BUZZER, 0);
 }
 
 void init_uart_irq() {
@@ -93,13 +85,13 @@ void buttons_init() {
     gpio_init(BTN_PIN_ESC);
     gpio_init(BTN_PIN_GIRAR);
     gpio_init(BTN_PIN_PEGAR);
-    gpio_init(buzz);
+    gpio_init(BUZZER);
 
     gpio_set_dir(BTN_PIN_ENTER, GPIO_IN);
     gpio_set_dir(BTN_PIN_ESC, GPIO_IN);
     gpio_set_dir(BTN_PIN_GIRAR, GPIO_IN);
     gpio_set_dir(BTN_PIN_PEGAR, GPIO_IN);
-    gpio_set_dir(buzz, GPIO_OUT);
+    gpio_set_dir(BUZZER, GPIO_OUT);
 
     gpio_pull_up(BTN_PIN_ENTER);
     gpio_pull_up(BTN_PIN_ESC);
@@ -176,7 +168,6 @@ void input_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
-
 
 void x_task(void *p) {
 
@@ -308,7 +299,6 @@ int main(void) {
     stdio_init_all();
     buttons_init();
     init_uart_hc06();
-    // hc06_config("MARIO", "3425");
     init_uart_irq();
 
     xSemaphoreLuz = xSemaphoreCreateBinary();
@@ -323,21 +313,18 @@ int main(void) {
     TaskHandle_t xHandle_sensor;
     // TaskHandle_t xHandle_bluetooth;
 
-    if (hc06_config("MARIO", "3425")) {
+    xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_input));
+    xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_x_task));
+    xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_y_task));
+    xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_sensor));
+    // xTaskCreate(bluetooth_task, "Bluetooth task", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_bluetooth));
 
-        xTaskCreate(input_task, "input", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_input));
-        xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_x_task));
-        xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_y_task));
-        xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_sensor));
-        // xTaskCreate(bluetooth_task, "Bluetooth task", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_bluetooth));
-        
-        vTaskCoreAffinitySet(xHandle_input, CORE_0);
-        // vTaskCoreAffinitySet(xHandle_bluetooth, CORE_0);
-        vTaskCoreAffinitySet(xHandle_sensor, CORE_1);
-        vTaskCoreAffinitySet(xHandle_x_task, CORE_1);
-        vTaskCoreAffinitySet(xHandle_y_task, CORE_1);
-        vTaskStartScheduler();
-    }
+    vTaskCoreAffinitySet(xHandle_input, CORE_0);
+    // vTaskCoreAffinitySet(xHandle_bluetooth, CORE_0);
+    vTaskCoreAffinitySet(xHandle_sensor, CORE_1);
+    vTaskCoreAffinitySet(xHandle_x_task, CORE_1);
+    vTaskCoreAffinitySet(xHandle_y_task, CORE_1);
+    vTaskStartScheduler();
     // Should never reach here
     for (;;)
         ;
