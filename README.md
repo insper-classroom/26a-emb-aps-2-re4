@@ -62,4 +62,6 @@ Vai ser enviado um conjunto de 4:
 | Jitter | 49.781 ms | 1.331 µs |1.265 µs | 1.236 µ |
 | Deadline Miss Rate	| 0 % | 0% |	0% |		0% |
 | Stack Usage | 480 | 468| 468 | 472 |
+
+
 como usamos o minimal config coloque o que sobrou
