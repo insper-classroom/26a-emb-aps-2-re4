@@ -54,3 +54,11 @@ Vai ser enviado um conjunto de 4:
 ## Diagrama de blocos
 
 ![](diagrama.png)
+
+
+| Métrica / Task	| sensor_task |	x_task	| y_task	| input_task |
+|:---| --- | --- | --- | ---: |
+| WCET |	25.96 µs | 3.12  µs |	3.08 µs |	
+| Jitter | 49.781 ms | 1.331 µs |1.265 µs |
+| Deadline Miss Rate	| 0 % | 0% |	100% ** |		
+| Stack Usage | 0.9033203125 | 4.4677734375% | 0.830078125% | 0.78125% |
