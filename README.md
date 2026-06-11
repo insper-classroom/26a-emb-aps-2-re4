@@ -55,6 +55,19 @@ Vai ser enviado um conjunto de 4:
 
 ![](diagrama.png)
 
+
+
+
+| Métrica / Task	| sensor_task |	x_task	| y_task	| input_task |
+|:---| --- | --- | --- | ---: |
+| WCET |	25.96 µs | 3.12  µs |	3.08 µs |	100.025 ms |
+| Jitter | 49.781 ms | 1.331 µs |1.265 µs | 1.236 µ |
+| Deadline Miss Rate	| 0 % | 0% |	0% |		0% |
+| Stack Usage | 480 | 468| 468 | 472 |
+
+
+como usamos o minimal config coloque o que sobrou
+
 ### Resultado final:
 
 ![](fotin_legal.jpeg)
