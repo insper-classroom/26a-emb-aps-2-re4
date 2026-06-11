@@ -8,32 +8,30 @@
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "pins.h"
-
-#define BTN_PIN_ENTER 15
-#define BTN_PIN_ESC 14
-#define BTN_PIN_GIRAR 13
-#define BTN_PIN_PEGAR 12
-#define SENSOR_PIN 7
-#define buzz 11
+#include "hc06.h"
 
 #define UART_ID uart0
 #define BAUD_RATE 115200
 #define CORE_0 (1 << 0)
 #define CORE_1 (1 << 1)
 
-#define SENSOR_PIN_1 2
-#define X_PIN 3
-#define Y_PIN 4
-#define INPUT_PIN 5
+// Nome - MARIO
+// PIN - 4269
+
 /* Semaphores */
 SemaphoreHandle_t xSemaphoreLuz;
 QueueHandle_t xQueueADC;
 QueueHandle_t xQueueBtn;
 QueueHandle_t xQueueData;
+QueueHandle_t xQueueTX;
+
+typedef struct {
+    int axis;
+    int val;
+} adc_t;
 
 void btn_callback(uint gpio, uint32_t events) {
     if (events == 0x08) {
-
         if (gpio == BTN_PIN_ENTER) {
             int btn = 7;
             xQueueSendFromISR(xQueueBtn, &btn, 0);
@@ -54,9 +52,9 @@ void btn_callback(uint gpio, uint32_t events) {
 }
 
 void vibra() {
-    gpio_put(buzz, 1);
+    gpio_put(BUZZER, 1);
     vTaskDelay(pdMS_TO_TICKS(150));
-    gpio_put(buzz, 0);
+    gpio_put(BUZZER, 0);
 }
 
 void buttons_init() {
@@ -64,13 +62,13 @@ void buttons_init() {
     gpio_init(BTN_PIN_ESC);
     gpio_init(BTN_PIN_GIRAR);
     gpio_init(BTN_PIN_PEGAR);
-    gpio_init(buzz);
+    gpio_init(BUZZER);
 
     gpio_set_dir(BTN_PIN_ENTER, GPIO_IN);
     gpio_set_dir(BTN_PIN_ESC, GPIO_IN);
     gpio_set_dir(BTN_PIN_GIRAR, GPIO_IN);
     gpio_set_dir(BTN_PIN_PEGAR, GPIO_IN);
-    gpio_set_dir(buzz, GPIO_OUT);
+    gpio_set_dir(BUZZER, GPIO_OUT);
 
     gpio_pull_up(BTN_PIN_ENTER);
     gpio_pull_up(BTN_PIN_ESC);
@@ -83,13 +81,27 @@ void buttons_init() {
     gpio_set_irq_enabled(BTN_PIN_PEGAR, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
 }
 
+static void tx_task(void *p) {
+    adc_t data;
+    gpio_init(tx_task_pin);
+    gpio_set_dir(tx_task_pin, GPIO_OUT);
+    while (true) {
+        gpio_put(tx_task_pin, 1);
+        if (xQueueReceive(xQueueTX, &data, portMAX_DELAY) == pdTRUE) {
+            uart_putc_raw(HC06_UART_ID, data.axis);
+            uart_putc_raw(HC06_UART_ID, data.val);
+            uart_putc_raw(HC06_UART_ID, data.val >> 8);
+            uart_putc_raw(HC06_UART_ID, -1);
+        }
+        gpio_put(tx_task_pin, 0);
+
+        vTaskDelay(pdMS_TO_TICKS(15));
+    }
+}
+
 /* Task function */
 void input_task(void *pvParameters) {
     int ligado = 0;
-    typedef struct adc {
-        int axis;
-        int val;
-    } adc_t;
     gpio_init(INPUT_PIN);
     gpio_set_dir(INPUT_PIN, GPIO_OUT);
 
@@ -105,30 +117,26 @@ void input_task(void *pvParameters) {
         if (xSemaphoreTake(xSemaphoreLuz, pdMS_TO_TICKS(50))) {
             if (!ligado) {
                 int valor = 42;
-                uart_putc(UART_ID, -1);
-                uart_putc(UART_ID, 1);
-                uart_putc(UART_ID, valor);
-                uart_putc(UART_ID, (valor >> 8));
-                ligado = 1;
                 vibra();
+                uart_putc_raw(HC06_UART_ID, -1);
+                uart_putc_raw(HC06_UART_ID, 1);
+                uart_putc_raw(HC06_UART_ID, valor);
+                uart_putc_raw(HC06_UART_ID, (valor >> 8));
+                ligado = 1;
             }
             if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(50))) {
-                // printf("botao %d\n", ang);
                 int valor = 42;
-                uart_putc(UART_ID, -1);
-                uart_putc(UART_ID, ang);
-                uart_putc(UART_ID, valor);
-                uart_putc(UART_ID, (valor >> 8));
                 vibra();
+                uart_putc_raw(HC06_UART_ID, -1);
+                uart_putc_raw(HC06_UART_ID, ang);
+                uart_putc_raw(HC06_UART_ID, valor);
+                uart_putc_raw(HC06_UART_ID, (valor >> 8));
                 vTaskDelay(pdMS_TO_TICKS(500));
             } else if (xQueueReceive(xQueueADC, &joystick, pdMS_TO_TICKS(50))) {
-                // printf("seta %d\n", joystick.axis);
-                // printf("%d \n", joystick.val);
-                uart_putc(UART_ID, -1);
-
-                uart_putc(UART_ID, joystick.axis);
-                uart_putc(UART_ID, joystick.val);
-                uart_putc(UART_ID, (joystick.val >> 8));
+                uart_putc_raw(HC06_UART_ID, -1);
+                uart_putc_raw(HC06_UART_ID, joystick.axis);
+                uart_putc_raw(HC06_UART_ID, joystick.val);
+                uart_putc_raw(HC06_UART_ID, (joystick.val >> 8));
                 vTaskDelay(pdMS_TO_TICKS(500));
             }
         } else {
@@ -147,11 +155,6 @@ void x_task(void *p) {
     int data_1 = 0;
     int data_2 = 0;
     int data_3 = 0;
-    // const float conversion_factor = 3.3f / (1 << 12);
-    typedef struct adc {
-        int axis;
-        int val;
-    } adc_t;
     gpio_init(X_PIN);
     gpio_set_dir(X_PIN, GPIO_OUT);
     while (true) {
@@ -166,38 +169,32 @@ void x_task(void *p) {
         data_3 = result_4;
         result_4 -= 2047;
         result_4 /= 8;
-        if (result_4 > 100) {
+        if (result_4 > 90) {
             adc_t pos;
             pos.axis = 4;
             pos.val = result_4;
-            // printf("aaa %d\n",pos.val);
+            // printf("Valor: %d\n", result_4);
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
-        if (result_4 < -100) {
+        if (result_4 < -90) {
             adc_t pos;
             pos.axis = 5;
             pos.val = result_4;
-            // printf("aaa %d\n",pos.val);
+            // printf("Valor: %d\n", result_4);
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
-        // printf("eixo x: %d\n", result);
         gpio_put(X_PIN, 0);
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(80));
     }
 }
 
 void y_task(void *p) {
     adc_init();
-    // const float conversion_factor = 3.3f / (1 << 12);
     adc_gpio_init(26);
     int data_0 = 0;
     int data_1 = 0;
     int data_2 = 0;
     int data_3 = 0;
-    typedef struct adc {
-        int axis;
-        int val;
-    } adc_t;
     gpio_init(Y_PIN);
     gpio_set_dir(Y_PIN, GPIO_OUT);
     while (true) {
@@ -212,26 +209,25 @@ void y_task(void *p) {
         data_3 = result_4;
         result_4 -= 2047;
         result_4 /= 8;
-        if (result_4 > 100) {
+        if (result_4 > 90) {
             adc_t pos;
             pos.axis = 2;
             pos.val = result_4;
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
-        if (result_4 < -100) {
+        if (result_4 < -90) {
             adc_t pos;
             pos.axis = 3;
             pos.val = result_4;
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
         gpio_put(Y_PIN, 0);
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(80));
     }
 }
 
 void sensor_task(void *p) {
     adc_init();
-    // const float conversion_factor = 3.3f / (1 << 12);
     adc_gpio_init(28);
     int data_0 = 0;
     int data_1 = 0;
@@ -252,24 +248,58 @@ void sensor_task(void *p) {
 
         luz_1 -= 3330;
         if (luz_1 > 200) {
-            // printf("luz: %d\n", luz_1);
             xSemaphoreGive(xSemaphoreLuz);
         }
         gpio_put(SENSOR_PIN_1, 0);
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
+
+// void stack_monitor_task(void *p) {
+//     static TaskStatus_t tasks[16];
+//     while (true) {
+//         vTaskDelay(pdMS_TO_TICKS(2000));
+//         UBaseType_t n = uxTaskGetSystemState(tasks, 16, NULL);
+//         printf("+------------------+-------+\n");
+//         printf("| %-16s | %5s |\n", "task", "free");
+//         printf("+------------------+-------+\n");
+//         for (UBaseType_t i = 0; i < n; i++) {
+//             printf("| %-16s | %5u |\n",
+//                    tasks[i].pcTaskName,
+//                    (unsigned)tasks[i].usStackHighWaterMark);
+//         }
+//         printf("+------------------+-------+\n");
+//         printf("| heap livre min   | %5u |\n",
+//                (unsigned)xPortGetMinimumEverFreeHeapSize());
+//         printf("+------------------+-------+\n\n");
+//     }
+// }
+
+
+void init_uart_hc06(void) {
+    uart_init(HC06_UART_ID, HC06_BAUD_RATE);
+
+    gpio_set_function(HC06_TX_PIN, UART_FUNCSEL_NUM(HC06_UART_ID, HC06_TX_PIN));
+    gpio_set_function(HC06_RX_PIN, UART_FUNCSEL_NUM(HC06_UART_ID, HC06_RX_PIN));
+
+    int __unused actual = uart_set_baudrate(HC06_UART_ID, HC06_BAUD_RATE);
+
+    uart_set_hw_flow(HC06_UART_ID, false, false);
+
+    uart_set_format(HC06_UART_ID, 8, 1, UART_PARITY_NONE);
+}
+
     int main(void) {
     stdio_init_all();
     buttons_init();
-    typedef struct adc {
-        int axis;
-        int val;
-    } adc_t;
+    init_uart_hc06();
+    // vibra();
+
     xSemaphoreLuz = xSemaphoreCreateBinary();
     xQueueADC = xQueueCreate(1, sizeof(adc_t));
     xQueueBtn = xQueueCreate(32, sizeof(int));
-    xQueueData = xQueueCreate(64, sizeof(int));
+    xQueueData = xQueueCreate(64, sizeof(adc_t));
+    xQueueTX = xQueueCreate(32, sizeof(adc_t));
 
     TaskHandle_t xHandle_input;
     TaskHandle_t xHandle_x_task;
@@ -280,13 +310,14 @@ void sensor_task(void *p) {
     xTaskCreate(x_task, "x", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_x_task));
     xTaskCreate(y_task, "y", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_y_task));
     xTaskCreate(sensor_task, "sensor", configMINIMAL_STACK_SIZE, NULL, 1, &(xHandle_sensor));
+    // xTaskCreate(stack_monitor_task, "stackk 1", 4096, NULL, 1, NULL);
+
 
     vTaskCoreAffinitySet(xHandle_input, CORE_0);
     vTaskCoreAffinitySet(xHandle_sensor, CORE_1);
     vTaskCoreAffinitySet(xHandle_x_task, CORE_1);
     vTaskCoreAffinitySet(xHandle_y_task, CORE_1);
     vTaskStartScheduler();
-
     // Should never reach here
     for (;;)
         ;
