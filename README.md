@@ -54,3 +54,7 @@ Vai ser enviado um conjunto de 4:
 ## Diagrama de blocos
 
 ![](diagrama.png)
+
+### Resultado final:
+
+![](fotin_legal.jpeg)
