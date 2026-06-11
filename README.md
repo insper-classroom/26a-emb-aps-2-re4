@@ -65,3 +65,4 @@ Vai ser enviado um conjunto de 4:
 
 
 como usamos o minimal config coloque o que sobrou
+![](main\fotin_legal.jpeg)
