@@ -117,20 +117,20 @@ void input_task(void *pvParameters) {
         if (xSemaphoreTake(xSemaphoreLuz, pdMS_TO_TICKS(50))) {
             if (!ligado) {
                 int valor = 42;
+                vibra();
                 uart_putc_raw(HC06_UART_ID, -1);
                 uart_putc_raw(HC06_UART_ID, 1);
                 uart_putc_raw(HC06_UART_ID, valor);
                 uart_putc_raw(HC06_UART_ID, (valor >> 8));
                 ligado = 1;
-                vibra();
             }
             if (xQueueReceive(xQueueBtn, &ang, pdMS_TO_TICKS(50))) {
                 int valor = 42;
+                vibra();
                 uart_putc_raw(HC06_UART_ID, -1);
                 uart_putc_raw(HC06_UART_ID, ang);
                 uart_putc_raw(HC06_UART_ID, valor);
                 uart_putc_raw(HC06_UART_ID, (valor >> 8));
-                vibra();
                 vTaskDelay(pdMS_TO_TICKS(500));
             } else if (xQueueReceive(xQueueADC, &joystick, pdMS_TO_TICKS(50))) {
                 uart_putc_raw(HC06_UART_ID, -1);
@@ -169,20 +169,22 @@ void x_task(void *p) {
         data_3 = result_4;
         result_4 -= 2047;
         result_4 /= 8;
-        if (result_4 > 70) {
+        if (result_4 > 90) {
             adc_t pos;
             pos.axis = 4;
             pos.val = result_4;
+            // printf("Valor: %d\n", result_4);
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
-        if (result_4 < -70) {
+        if (result_4 < -90) {
             adc_t pos;
             pos.axis = 5;
             pos.val = result_4;
+            // printf("Valor: %d\n", result_4);
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
         gpio_put(X_PIN, 0);
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(80));
     }
 }
 
@@ -207,20 +209,20 @@ void y_task(void *p) {
         data_3 = result_4;
         result_4 -= 2047;
         result_4 /= 8;
-        if (result_4 > 70) {
+        if (result_4 > 90) {
             adc_t pos;
             pos.axis = 2;
             pos.val = result_4;
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
-        if (result_4 < -70) {
+        if (result_4 < -90) {
             adc_t pos;
             pos.axis = 3;
             pos.val = result_4;
             xQueueSend(xQueueADC, &pos, pdMS_TO_TICKS(30));
         }
         gpio_put(Y_PIN, 0);
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(80));
     }
 }
 
@@ -287,10 +289,11 @@ void init_uart_hc06(void) {
     uart_set_format(HC06_UART_ID, 8, 1, UART_PARITY_NONE);
 }
 
-int main(void) {
+    int main(void) {
     stdio_init_all();
     buttons_init();
     init_uart_hc06();
+    // vibra();
 
     xSemaphoreLuz = xSemaphoreCreateBinary();
     xQueueADC = xQueueCreate(1, sizeof(adc_t));

@@ -25,7 +25,8 @@ def move_mouse(axis, value):
     * 10 - Desseleciona o item (Esc)
     * 11 - Pega o item selecionado (Backspace)
     """
-    print(axis)
+    # print(axis)
+    print(value)
     if axis == 1:
         pdi.press("tab")
     elif axis == 2:
